@@ -41,7 +41,7 @@ async def main() -> None:
 
     pdf_image_to_markdown_manager = PdfImageToMarkdownManager(azure_open_ai_config)
 
-    pdf_file_path_and_name: str = "1B 5812 - HHS OASH OCIO IT Support Services BPA, HHS OASH Volume 1_Technical_ACT.pdf"
+    pdf_file_path_and_name: str = "Test Case RFx document.pdf"
     markdown: str = await pdf_image_to_markdown_manager.get_markdown_for_pdf_document_using_page_images(pdf_file_path_and_name)
     # markdown: str = await pdf_image_to_markdown_manager.get_markdown_for_pdf_document_using_plain_text(pdf_file_path_and_name)
 

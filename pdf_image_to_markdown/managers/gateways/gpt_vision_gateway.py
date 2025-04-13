@@ -58,6 +58,7 @@ class GptVisionGateway:
                 }
             ],
             max_tokens=self.max_tokens,
+            temperature=0.0,
         )
 
         return response.choices[0].message.content or ""
@@ -72,6 +73,7 @@ class GptVisionGateway:
                 }
             ],
             max_tokens=self.max_tokens,
+            temperature=0.0,
         )
 
         return response.choices[0].message.content or ""
@@ -97,6 +99,7 @@ class GptVisionGateway:
             model=self.model_deployment_name,
             messages=messages,
             max_tokens=self.max_tokens,
+            temperature=0.0,
         )
 
         return response.choices[0].message.content or ""
@@ -119,6 +122,7 @@ class GptVisionGateway:
             model=self.model_deployment_name,
             messages=messages,
             max_tokens=self.max_tokens,
+            temperature=0.0,
         )
 
         return response.choices[0].message.content or ""

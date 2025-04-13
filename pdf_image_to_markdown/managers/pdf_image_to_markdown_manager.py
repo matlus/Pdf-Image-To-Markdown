@@ -5,6 +5,7 @@ import fitz
 
 from pdf_image_to_markdown.managers.gateways.gpt_vision_gateway import GptVisionGateway
 from pdf_image_to_markdown.managers.models.azure_openai_config import AzureOpenAiConfig
+from pdf_image_to_markdown.managers.processors.markdown_custom_markers_cleaner import MarkdownCustomMarkesCleaner
 from pdf_image_to_markdown.managers.processors.plaintext_to_markdown_prompt_result_processor import (
     PlaintextToMarkdownPromptResultProcessor,  # PyMuPDF
 )
@@ -12,9 +13,9 @@ from pdf_image_to_markdown.managers.processors.plaintext_to_markdown_prompt_resu
 
 class PdfImageToMarkdownManager:
     def __init__(self, azure_openai_config: AzureOpenAiConfig) -> None:
-        self.pdf_image_to_markdown_prompt: str = self._get_system_prompt("pdf_image_to_markdown_prompt_v2")
+        self.pdf_image_to_markdown_prompt: str = self._get_system_prompt("pdf_image_to_markdown_prompt_v3")
         self.pdf_text_to_markdown_prompt: str = self._get_system_prompt("simple_markdown_prompt")
-        self.markdown_fixup_clean_prompt: str = self._get_system_prompt("markdown_fixup_clean_prompt")
+        self.markdown_fixup_clean_prompt: str = self._get_system_prompt("markdown_fixup_clean_prompt_v2")
         self.azure_openai_config: AzureOpenAiConfig = azure_openai_config
         self.gpt_vision_gateway: GptVisionGateway = GptVisionGateway(azure_openai_config, self.pdf_image_to_markdown_prompt)
 
@@ -25,7 +26,7 @@ class PdfImageToMarkdownManager:
         with open(f"{full_path}.md", encoding="utf-8") as f:
             return f.read()
 
-    async def get_markdown_for_pdf_document_using_page_images(self, pdf_path: str, batch_size: int = 5) -> str:
+    async def get_markdown_for_pdf_document_using_page_images(self, pdf_path: str, batch_size: int = 1) -> str:
         # Step 1: Convert PDF document pages to images
         print("Convert PDF document pages to images")
         image_paths: list[Path] = self.convert_pdf_document_pages_to_images(pdf_path)
@@ -34,6 +35,7 @@ class PdfImageToMarkdownManager:
         # Step 2: Generate markdown for image pages in batches
         markdown_pages: list[str] = []
         total_pages: int = len(image_paths)
+        toc_from_content: dict[int, list[str]] = {}
 
         # Step 3: Process images in batches of the specified size
         for batch_start in range(0, total_pages, batch_size):
@@ -54,13 +56,38 @@ class PdfImageToMarkdownManager:
                 markdown_pages.append(fixedup_markdown)
             # Process single page with the single-page method
             else:
-                markdown_string: str = await self.gpt_vision_gateway.get_markdown_for_page(current_batch[0])
-                fixedup_markdown: str = await self.gpt_vision_gateway.fixup_and_clean_markdown(markdown_string, self.markdown_fixup_clean_prompt)
+                initial_markdown_string: str = await self.gpt_vision_gateway.get_markdown_for_page(current_batch[0])
+                with Path(f"batch-markdown-initial{batch_start + 1}.md").open("w", encoding="utf-8") as batch_markdown_file:
+                    batch_markdown_file.write(initial_markdown_string)
+
+                markdown_string_without_markers = MarkdownCustomMarkesCleaner.clean_up_markers(initial_markdown_string)
+
+                if not MarkdownCustomMarkesCleaner.has_maaningful_content(markdown_string_without_markers):
+                    continue
+
+                with Path(f"batch-markdown-without-markers{batch_start + 1}.md").open("w", encoding="utf-8") as batch_markdown_file:
+                    batch_markdown_file.write(markdown_string_without_markers)
+
+                initial_fixedup_and_clean_markdown: str = await self.gpt_vision_gateway.fixup_and_clean_markdown(
+                    markdown_string_without_markers, self.markdown_fixup_clean_prompt
+                )
+                (fixedup_markdown, toc_from_page_content) = MarkdownCustomMarkesCleaner.clean_markers_and_extract_toc(
+                    initial_fixedup_and_clean_markdown
+                )
+                if toc_from_page_content:
+                    toc_from_content[batch_start + 1] = toc_from_page_content
+
+                if not fixedup_markdown.endswith("\n-----\n"):
+                    fixedup_markdown += "\n-----\n"
+
+                with Path(f"batch-markdown-fixed{batch_start + 1}.md").open("w", encoding="utf-8") as batch_markdown_file:
+                    batch_markdown_file.write(fixedup_markdown)
+
                 markdown_pages.append(fixedup_markdown)
 
             print(f"Completed processing pages {batch_start + 1} to {batch_end} of {total_pages}")
 
-        return "\n\n-----\n\n".join(markdown_pages)
+        return "".join(markdown_pages)
 
     async def get_markdown_for_pdf_document_using_plain_text(self, pdf_path: str, batch_size: int = 1) -> str:
         # Step 1: Get pages from the PDF document
