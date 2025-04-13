@@ -3,6 +3,9 @@ import os
 import time
 from pathlib import Path
 from typing import Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from pdf_image_to_markdown.managers.models.azure_openai_config import AzureOpenAiConfig
 from pdf_image_to_markdown.managers.models.storage_account_config import StorageAccountConfig
@@ -15,19 +18,19 @@ def get_configuration_settings() -> tuple[StorageAccountConfig, AzureOpenAiConfi
     assert blob_container_url is not None, "BLOB_CONTAINER_URL environment variable is not set"
 
     # Get Azure Open API related Configuration
-    endpoint = os.getenv("endpoint")
-    assert endpoint is not None, "endpoint environment variable is not set"
-    api_version = os.getenv("apiVersion")
-    assert api_version is not None, "apiVersion environment variable is not set"
-    model_deployment_name = os.getenv("modelDeploymentName")
-    assert model_deployment_name is not None, "modelDeploymentName environment variable is not set"
+    endpoint = os.getenv("OPENAI_ENDPOINT")
+    assert endpoint is not None, "OPENAI_ENDPOINT environment variable is not set"
+    api_version = os.getenv("OPENAI_API_VERSION")
+    assert api_version is not None, "OPENAI_API_VERSION environment variable is not set"
+    model_deployment_name = os.getenv("MODEL_DEPLOYMENT_NAME")
+    assert model_deployment_name is not None, "MODEL_DEPLOYMENT_NAME environment variable is not set"
 
     # Optional Configuration
     # api_key or token_provider_url must be present
-    api_key: Optional[str] = os.getenv("accessKey")
+    api_key: Optional[str] = os.getenv("ACCESS_KEY")
     token_provider_url: Optional[str] = os.getenv("tokenProviderUrl")
 
-    azure_open_ai_config = AzureOpenAiConfig(endpoint, api_version, model_deployment_name, "", "", api_key, token_provider_url)
+    azure_open_ai_config = AzureOpenAiConfig(endpoint, api_version, model_deployment_name, api_key, token_provider_url)
     storage_account_config = StorageAccountConfig(blob_container_url, token_provider_url)
 
     return storage_account_config, azure_open_ai_config
